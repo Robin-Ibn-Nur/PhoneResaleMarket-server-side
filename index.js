@@ -42,6 +42,7 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 async function run() {
     try {
         const phoneResaleCollection = client.db('phoneResale').collection('brandName');
+        const bookingsCollection = client.db('phoneResale').collection('bookings');
         // const usersCollection = client.db('doctorsPortal').collection('users');
         // const doctorsCollection = client.db('doctorsPortal').collection('doctors');
         // const paymentsCollection = client.db('doctorsPortal').collection('payments');
@@ -61,6 +62,14 @@ async function run() {
             const phones = await phoneResaleCollection.findOne(query);
             res.send(phones);
         })
+
+
+        // get orders from seller
+        app.post('/bookings', async (req, res) => {
+            const booking = req.body;
+            const result = await bookingsCollection.insertOne(booking);
+            res.send(result);
+        });
 
 
         // verifyAdmin after verifyJWT
