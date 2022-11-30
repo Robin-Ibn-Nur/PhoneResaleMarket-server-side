@@ -9,6 +9,8 @@ const port = process.env.PORT || 5000;
 
 const app = express();
 
+
+
 // creating token with something or whatever it can be ignored
 // (require('crypto').randomBytes(64).toString('hex'))
 
@@ -119,9 +121,7 @@ async function run() {
         // // creating users when signup
         app.put('/users', async (req, res) => {
             const user = req.body;
-            console.log(user);
             const result = await usersCollection.insertOne(user);
-            console.log(result);
             res.send(result);
         });
 
