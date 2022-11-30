@@ -168,6 +168,16 @@ async function run() {
             res.send({ isAdmin: user?.role === 'admin' });
         })
 
+
+        // make useSeller hook to access
+        app.get('/users/seller/:email', async (req, res) => {
+            const email = req.params.email;
+            console.log(email)
+            const query = { email }
+            const user = await usersCollection.findOne(query);
+            res.send({ isAdmin: user?.role === 'seller' });
+        })
+
         // save data from add to product of seller verifyJWT, verifyAdmin,
         app.post('/sellerProduct', async (req, res) => {
             const sellerProduct = req.body;
