@@ -3,8 +3,7 @@ const cors = require('cors');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
-
-// const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const port = process.env.PORT || 5000;
 
@@ -23,24 +22,25 @@ console.log(uri)
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 
 // this is a middleware to verify the user with jwt token
-function verifyJWT(req, res, next) {
+// function verifyJWT(req, res, next) {
 
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-        return res.status(401).send('unauthorized access');
-    }
+//     const authHeader = req.headers.authorization;
+//     if (!authHeader) {
+//         return res.status(401).send('unauthorized access');
+//     }
 
-    const token = authHeader.split(' ')[1];
+//     const token = authHeader.split(' ')[1];
 
-    jwt.verify(token, process.env.SECRET_ACCESS_TOKEN, function (err, decoded) {
-        if (err) {
-            return res.status(403).send({ message: 'forbidden access' })
-        }
-        req.decoded = decoded;
-        next();
-    })
+//     jwt.verify(token, process.env.SECRET_ACCESS_TOKEN, function (err, decoded) {
+//         if (err) {
+//             console.log(err)
+//             return res.status(403).send({ message: 'forbidden access' })
+//         }
+//         req.decoded = decoded;
+//         next();
+//     })
 
-}
+// }
 
 
 async function run() {
@@ -48,16 +48,17 @@ async function run() {
         const phoneResaleCollection = client.db('phoneResale').collection('brandName');
         const bookingsCollection = client.db('phoneResale').collection('bookings');
         const usersCollection = client.db('phoneResale').collection('users');
+        const paymentsCollection = client.db('phoneResale').collection('payments');
+        // const sellerCollection = client.db('phoneResale').collection('seller');
+        // const buyerCollection = client.db('phoneResale').collection('buyer');
         const sellerProductCollection = client.db('phoneResale').collection('sellerProduct');
-        // const doctorsCollection = client.db('doctorsPortal').collection('doctors');
-        // const paymentsCollection = client.db('doctorsPortal').collection('payments');
 
 
-        // load all brandName data
+
+        // load all brandName data to home
         app.get('/brandName', async (req, res) => {
             const query = {}
             const options = await phoneResaleCollection.find(query).toArray();
-            console.log(options)
             res.send(options);
         })
 
@@ -68,7 +69,7 @@ async function run() {
             res.send(result);
         })
 
-        // route will show products in the same category
+        // // route will show products in the same category
         app.get('/brandName/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: ObjectId(id) }
@@ -77,48 +78,55 @@ async function run() {
         })
 
 
-        // get orders from seller
+        // // get orders from seller
         app.post('/bookings', async (req, res) => {
             const booking = req.body;
             const result = await bookingsCollection.insertOne(booking);
             res.send(result);
         });
 
-        // this bookings route shows on my orders page
-        //  verifyJWT will use letter,
-        app.get('/bookings', verifyJWT, async (req, res) => {
-            const email = req.query.email;
-            const decodedEmail = req.decoded.email;
+        // // get payment by id verifyJWT
+        app.get('/bookings/:id', async (req, res) => {
+            const id = req.params.id;
+            console.log(id)
+            const query = { _id: ObjectId(id) };
+            const booking = await bookingsCollection.findOne(query);
+            console.log(booking)
+            res.send(booking);
+        })
 
-            if (email !== decodedEmail) {
-                return res.status(403).send({ message: 'forbidden access' });
-            }
+
+
+        // // this bookings route shows on my orders page /verifyJWT/
+        app.get('/bookings', async (req, res) => {
+            const email = req.query.email;
+            console.log(email);
+            // const decodedEmail = req.decoded.email;
+
+            // if (email !== decodedEmail) {
+            //     return res.status(403).send({ message: 'forbidden access' });
+            // }
 
             const query = { email: email };
             const bookings = await bookingsCollection.find(query).toArray();
             res.send(bookings);
         });
 
-        // when user creat jwt token will found
-        app.get('/jwt', async (req, res) => {
-            const email = req.query.email;
-            const query = { email: email };
-            const user = await usersCollection.findOne(query);
-            if (user) {
-                const token = jwt.sign({ email }, process.env.SECRET_ACCESS_TOKEN, { expiresIn: '1d' })
-                return res.send({ accessToken: token });
-            }
-            res.status(403).send({ accessToken: '' })
-        });
 
-        // showing allusers in all users component without admin nobody can see the users
-        app.get('/users', async (req, res) => {
-            const query = {};
-            const users = await usersCollection.find(query).toArray();
-            res.send(users);
-        });
 
-        // creating users when signup
+        // // when user creat jwt token will found
+        // app.get('/jwt', async (req, res) => {
+        //     const email = req.query.email;
+        //     const query = { email: email };
+        //     const user = await usersCollection.findOne(query);
+        //     if (user) {
+        //         const token = jwt.sign({ email }, process.env.SECRET_ACCESS_TOKEN, { expiresIn: '1d' })
+        //         return res.send({ accessToken: token });
+        //     }
+        //     res.status(403).send({ accessToken: '' })
+        // });
+
+        // // creating users when signup
         app.put('/users', async (req, res) => {
             const user = req.body;
             console.log(user);
@@ -126,81 +134,139 @@ async function run() {
             res.send(result);
         });
 
-        // verifyAdmin after verifyJWT
-        const verifyAdmin = async (req, res, next) => {
-            const decodedEmail = req.decoded.email;
-            const query = { email: decodedEmail };
-            const user = await usersCollection.findOne(query);
-
-            if (user?.role !== 'admin') {
-                return res.status(403).send({ message: 'forbidden access' })
-            }
-            next();
-        }
-
-        // make an admin  verifyAdmin,verifyJWT,
-        app.put('/users/admin/:id', verifyAdmin, async (req, res) => {
-            const id = req.params.id;
-            const filter = { _id: ObjectId(id) }
-            const options = { upsert: true };
-            const updatedDoc = {
-                $set: {
-                    role: 'admin'
-                }
-            }
-            const result = await usersCollection.updateOne(filter, updatedDoc, options);
-            res.send(result);
+        // // showing allusers in all users component without admin nobody can see the users
+        app.get('/users', async (req, res) => {
+            const query = {};
+            const users = await usersCollection.find(query).toArray();
+            res.send(users);
         });
+
+
+        // // verifyAdmin after verifyJWT
+        // const verifyAdmin = async (req, res, next) => {
+        //     const decodedEmail = req.decoded.email;
+        //     const query = { email: decodedEmail };
+        //     const user = await usersCollection.findOne(query);
+
+        //     if (user?.role !== 'admin') {
+        //         return res.status(403).send({ message: 'forbidden access' })
+        //     }
+        //     next();
+        // }
+
+        // // make an admin  verifyAdmin,verifyJWT,
+        // app.put('/users/admin/:id', verifyAdmin, async (req, res) => {
+        //     const id = req.params.id;
+        //     const filter = { _id: ObjectId(id) }
+        //     const options = { upsert: true };
+        //     const updatedDoc = {
+        //         $set: {
+        //             role: 'admin'
+        //         }
+        //     }
+        //     const result = await usersCollection.updateOne(filter, updatedDoc, options);
+        //     res.send(result);
+        // });
 
 
         app.get('/users/admin/:email', async (req, res) => {
             const email = req.params.email;
+            console.log(email)
             const query = { email }
             const user = await usersCollection.findOne(query);
             res.send({ isAdmin: user?.role === 'admin' });
         })
 
         // save data from add to product of seller verifyJWT, verifyAdmin,
-        app.post('/sellerProduct', verifyJWT, async (req, res) => {
+        app.post('/sellerProduct', async (req, res) => {
             const sellerProduct = req.body;
             const result = await sellerProductCollection.insertOne(sellerProduct);
             res.send(result);
         });
 
-        // load data to myProducts
-        app.get('/sellerProduct', verifyJWT, async (req, res) => {
+        // load data to myProducts / verifyJWT,
+        app.get('/sellerProduct', async (req, res) => {
             const query = {}
             const sellerProduct = await sellerProductCollection.find(query).toArray();
             res.send(sellerProduct);
         });
 
-        // app.delete('/doctors/:id', verifyJWT, verifyAdmin, async (req, res) => {
-        //     const id = req.params.id;
-        //     const filter = { _id: ObjectId(id) };
-        //     const result = await doctorsCollection.deleteOne(filter);
-        //     res.send(result);
-        // })
+        // delete data from myProducts verifyAdmin/ verifyJWT, 
+        app.delete('/sellerProduct/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id) };
+            const result = await sellerProductCollection.deleteOne(filter);
+            res.send(result);
+        })
+
+        // stripe payment method
+        app.post('/create-payment-intent', async (req, res) => {
+            const booking = req.body;
+            const price = booking.price;
+            const amount = price * 100;
+            const paymentIntent = await stripe.paymentIntents.create({
+                currency: 'usd',
+                amount: amount,
+                payment_method_types: [
+                    "card"
+                ]
+            });
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+            });
+        });
+
+        // update user payments into database
+        app.post('/payments', async (req, res) => {
+            const payment = req.body;
+            const result = await paymentsCollection.insertOne(payment);
+            const id = payment.bookingId
+            const filter = { _id: ObjectId(id) }
+            const updatedDoc = {
+                $set: {
+                    paid: true,
+                    transactionId: payment.transactionId
+                }
+            }
+            const updatedResult = await bookingsCollection.updateOne(filter, updatedDoc)
+            res.send(result);
+        })
+
+
+
+    }
+    finally {
+
+    }
+}
+run().catch(console.log);
+
+app.get('/', async (req, res) => {
+    res.send('phone resale server is running');
+})
+
+app.listen(port, () => console.log(`phone resale running on ${port}`))
 
 
 
 
 
+// doctors portal........................
 
-
-        // app.get('/appointmentSpecialty', async (req, res) => {
+// app.get('/appointmentSpecialty', async (req, res) => {
         //     const query = {}
         //     const result = await appointmentOptionCollection.find(query).project({ name: 1 }).toArray();
         //     res.send(result);
         // })
 
-        /***
-         * API Naming Convention 
-         * app.get('/bookings')
-         * app.get('/bookings/:id')
-         * app.post('/bookings')
-         * app.patch('/bookings/:id')
-         * app.delete('/bookings/:id')
-        */
+/***
+ * API Naming Convention
+ * app.get('/bookings')
+ * app.get('/bookings/:id')
+ * app.post('/bookings')
+ * app.patch('/bookings/:id')
+ * app.delete('/bookings/:id')
+*/
 
         // app.get('/bookings', verifyJWT, async (req, res) => {
         //     const email = req.query.email;
@@ -338,16 +404,3 @@ async function run() {
         //     const result = await doctorsCollection.deleteOne(filter);
         //     res.send(result);
         // })
-
-    }
-    finally {
-
-    }
-}
-run().catch(console.log);
-
-app.get('/', async (req, res) => {
-    res.send('phone resale server is running');
-})
-
-app.listen(port, () => console.log(`phone resale running on ${port}`))
