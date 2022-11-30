@@ -22,25 +22,25 @@ console.log(uri)
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 
 // this is a middleware to verify the user with jwt token
-// function verifyJWT(req, res, next) {
+function verifyJWT(req, res, next) {
 
-//     const authHeader = req.headers.authorization;
-//     if (!authHeader) {
-//         return res.status(401).send('unauthorized access');
-//     }
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+        return res.status(401).send('unauthorized access');
+    }
 
-//     const token = authHeader.split(' ')[1];
+    const token = authHeader.split(' ')[1];
 
-//     jwt.verify(token, process.env.SECRET_ACCESS_TOKEN, function (err, decoded) {
-//         if (err) {
-//             console.log(err)
-//             return res.status(403).send({ message: 'forbidden access' })
-//         }
-//         req.decoded = decoded;
-//         next();
-//     })
+    jwt.verify(token, process.env.SECRET_ACCESS_TOKEN, function (err, decoded) {
+        if (err) {
+            console.log(err)
+            return res.status(403).send({ message: 'forbidden access' })
+        }
+        req.decoded = decoded;
+        next();
+    })
 
-// }
+}
 
 
 async function run() {
@@ -49,8 +49,6 @@ async function run() {
         const bookingsCollection = client.db('phoneResale').collection('bookings');
         const usersCollection = client.db('phoneResale').collection('users');
         const paymentsCollection = client.db('phoneResale').collection('payments');
-        // const sellerCollection = client.db('phoneResale').collection('seller');
-        // const buyerCollection = client.db('phoneResale').collection('buyer');
         const sellerProductCollection = client.db('phoneResale').collection('sellerProduct');
 
 
@@ -96,17 +94,9 @@ async function run() {
         })
 
 
-
         // // this bookings route shows on my orders page /verifyJWT/
         app.get('/bookings', async (req, res) => {
             const email = req.query.email;
-            console.log(email);
-            // const decodedEmail = req.decoded.email;
-
-            // if (email !== decodedEmail) {
-            //     return res.status(403).send({ message: 'forbidden access' });
-            // }
-
             const query = { email: email };
             const bookings = await bookingsCollection.find(query).toArray();
             res.send(bookings);
@@ -115,22 +105,23 @@ async function run() {
 
 
         // // when user creat jwt token will found
-        // app.get('/jwt', async (req, res) => {
-        //     const email = req.query.email;
-        //     const query = { email: email };
-        //     const user = await usersCollection.findOne(query);
-        //     if (user) {
-        //         const token = jwt.sign({ email }, process.env.SECRET_ACCESS_TOKEN, { expiresIn: '1d' })
-        //         return res.send({ accessToken: token });
-        //     }
-        //     res.status(403).send({ accessToken: '' })
-        // });
+        app.get('/jwt', async (req, res) => {
+            const email = req.query.email;
+            const query = { email: email };
+            const user = await usersCollection.findOne(query);
+            if (user) {
+                const token = jwt.sign({ email }, process.env.SECRET_ACCESS_TOKEN, { expiresIn: '1d' })
+                return res.send({ accessToken: token });
+            }
+            res.status(403).send({ accessToken: '' })
+        });
 
         // // creating users when signup
         app.put('/users', async (req, res) => {
             const user = req.body;
             console.log(user);
             const result = await usersCollection.insertOne(user);
+            console.log(result);
             res.send(result);
         });
 
@@ -142,33 +133,33 @@ async function run() {
         });
 
 
-        // // verifyAdmin after verifyJWT
-        // const verifyAdmin = async (req, res, next) => {
-        //     const decodedEmail = req.decoded.email;
-        //     const query = { email: decodedEmail };
-        //     const user = await usersCollection.findOne(query);
+        // // verifyAdmin after
+        const verifyAdmin = async (req, res, next) => {
+            const decodedEmail = req.decoded.email;
+            const query = { email: decodedEmail };
+            const user = await usersCollection.findOne(query);
 
-        //     if (user?.role !== 'admin') {
-        //         return res.status(403).send({ message: 'forbidden access' })
-        //     }
-        //     next();
-        // }
+            if (user?.role !== 'admin') {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
+            next();
+        }
 
-        // // make an admin  verifyAdmin,verifyJWT,
-        // app.put('/users/admin/:id', verifyAdmin, async (req, res) => {
-        //     const id = req.params.id;
-        //     const filter = { _id: ObjectId(id) }
-        //     const options = { upsert: true };
-        //     const updatedDoc = {
-        //         $set: {
-        //             role: 'admin'
-        //         }
-        //     }
-        //     const result = await usersCollection.updateOne(filter, updatedDoc, options);
-        //     res.send(result);
-        // });
+        // // make a verify User  verifyAdmin,verifyJWT,
+        app.put('/users/admin/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id) }
+            const options = { upsert: true };
+            const updatedDoc = {
+                $set: {
+                    role: 'verified'
+                }
+            }
+            const result = await usersCollection.updateOne(filter, updatedDoc, options);
+            res.send(result);
+        });
 
-
+        // make useAdmin hook to access
         app.get('/users/admin/:email', async (req, res) => {
             const email = req.params.email;
             console.log(email)
