@@ -121,7 +121,9 @@ async function run() {
         // // creating users when signup
         app.put('/users', async (req, res) => {
             const user = req.body;
+            console.log(user);
             const result = await usersCollection.insertOne(user);
+            console.log(result)
             res.send(result);
         });
 
@@ -247,3 +249,6 @@ app.get('/', async (req, res) => {
 })
 
 app.listen(port, () => console.log(`phone resale running on ${port}`))
+
+
+// server side repo successfully transfered 
